@@ -10,11 +10,14 @@ import random
 from functools import reduce
 
 import sys
+
 sys.path.append('../build')
-from library import MCTS, Gomoku, NeuralNetwork
+from library import MCTS, Amazon, NeuralNetwork
 
 from neural_network import NeuralNetWorkWrapper
 from gomoku_gui import GomokuGUI
+from expand_map import flip_map
+
 
 def tuple_2d_to_numpy_2d(tuple_2d):
     # help function
@@ -25,7 +28,7 @@ def tuple_2d_to_numpy_2d(tuple_2d):
     return np.array(res)
 
 
-class Leaner():
+class Leaner:
     def __init__(self, config):
         # see config.py
         # gomoku
@@ -59,7 +62,8 @@ class Leaner():
         self.batch_size = config['batch_size']
         self.epochs = config['epochs']
         self.nnet = NeuralNetWorkWrapper(config['lr'], config['l2'], config['num_layers'],
-                                         config['num_channels'], config['n'], self.action_size, config['train_use_gpu'], self.libtorch_use_gpu)
+                                         config['num_channels'], config['n'], self.action_size, config['train_use_gpu'],
+                                         self.libtorch_use_gpu)
 
     def learn(self):
         # start gui
@@ -85,7 +89,8 @@ class Leaner():
                                      self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads)
             itr_examples = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_train_threads) as executor:
-                futures = [executor.submit(self.self_play, 1 if itr % 2 else -1, libtorch, k == 1) for k in range(1, self.num_eps + 1)]
+                futures = [executor.submit(self.self_play, 1 if itr % 2 else 2, libtorch, k == 1) for k in
+                           range(1, self.num_eps + 1)]
                 for k, f in enumerate(futures):
                     examples = f.result()
                     itr_examples += examples
@@ -100,7 +105,7 @@ class Leaner():
 
             # prepare train data
             self.examples_buffer.append(itr_examples)
-            train_data = reduce(lambda a, b : a + b, self.examples_buffer)
+            train_data = reduce(lambda a, b: a + b, self.examples_buffer)
             random.shuffle(train_data)
 
             # train neural network
@@ -112,9 +117,11 @@ class Leaner():
             # compare performance
             if itr % self.check_freq == 0:
                 libtorch_current = NeuralNetwork('./models/checkpoint.pt',
-                                         self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads // 2)
+                                                 self.libtorch_use_gpu,
+                                                 self.num_mcts_threads * self.num_train_threads // 2)
                 libtorch_best = NeuralNetwork('./models/best_checkpoint.pt',
-                                              self.libtorch_use_gpu, self.num_mcts_threads * self.num_train_threads // 2)
+                                              self.libtorch_use_gpu,
+                                              self.num_mcts_threads * self.num_train_threads // 2)
 
                 one_won, two_won, draws = self.contest(libtorch_current, libtorch_best, self.num_contest)
                 print("NEW/PREV WINS : %d / %d ; DRAWS : %d" % (one_won, two_won, draws))
@@ -140,13 +147,15 @@ class Leaner():
         train_examples = []
 
         player1 = MCTS(libtorch, self.num_mcts_threads, self.c_puct,
-                    self.num_mcts_sims, self.c_virtual_loss, self.action_size)
+                       self.num_mcts_sims, self.c_virtual_loss, self.action_size)
         player2 = MCTS(libtorch, self.num_mcts_threads, self.c_puct,
-            self.num_mcts_sims, self.c_virtual_loss, self.action_size)
+                       self.num_mcts_sims, self.c_virtual_loss, self.action_size)
         players = [player2, None, player1]
         player_index = 1
 
-        gomoku = Gomoku(self.n, self.n_in_row, first_color)
+        gomoku = Amazon(first_color)
+        # TAG: 完成图形界面后记得改回来
+        show = False
 
         if show:
             self.gomoku_gui.reset_status()
@@ -167,9 +176,9 @@ class Leaner():
             last_action = gomoku.get_last_move()
             cur_player = gomoku.get_current_color()
 
-            sym = self.get_symmetries(board, prob, last_action)
+            sym = self.get_symmetries(board, prob, last_action, cur_player)
             for b, p, a in sym:
-                train_examples.append([b, a, cur_player, p])
+                train_examples.append([b, a, cur_player, first_color, p])
 
             # dirichlet noise
             legal_moves = list(gomoku.get_legal_moves())
@@ -198,8 +207,8 @@ class Leaner():
             # is ended
             ended, winner = gomoku.get_game_status()
             if ended == 1:
-                # b, last_action, cur_player, p, v
-                return [(x[0], x[1], x[2], x[3], x[2] * winner) for x in train_examples]
+                # b, last_action, cur_player, firsthand, p, v
+                return [(x[0], x[1], x[2], x[3], x[4], 1 if x[2] == winner else -1) for x in train_examples]
 
     def contest(self, network1, network2, num_contest):
         """compare new and old model
@@ -209,8 +218,9 @@ class Leaner():
         one_won, two_won, draws = 0, 0, 0
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_train_threads) as executor:
-            futures = [executor.submit(\
-                self._contest, network1, network2, 1 if k <= num_contest // 2 else -1, k == 1) for k in range(1, num_contest + 1)]
+            futures = [executor.submit(
+                self._contest, network1, network2, 1 if k <= num_contest // 2 else -1, k == 1) for k in
+                range(1, num_contest + 1)]
             for f in futures:
                 winner = f.result()
                 if winner == 1:
@@ -225,14 +235,14 @@ class Leaner():
     def _contest(self, network1, network2, first_player, show):
         # create MCTS
         player1 = MCTS(network1, self.num_mcts_threads, self.c_puct,
-            self.num_mcts_sims, self.c_virtual_loss, self.action_size)
+                       self.num_mcts_sims, self.c_virtual_loss, self.action_size)
         player2 = MCTS(network2, self.num_mcts_threads, self.c_puct,
-                    self.num_mcts_sims, self.c_virtual_loss, self.action_size)
+                       self.num_mcts_sims, self.c_virtual_loss, self.action_size)
 
         # prepare
         players = [player2, None, player1]
         player_index = first_player
-        gomoku = Gomoku(self.n, self.n_in_row, first_player)
+        gomoku = Amazon(first_player)
         if show:
             self.gomoku_gui.reset_status()
 
@@ -260,26 +270,48 @@ class Leaner():
 
             # next player
             player_index = -player_index
+    # Done：对称
+    def get_symmetries(self, board, pi, last_action, cur_color):
+        # mirror, nop rotational
+        assert (len(pi) == self.action_size)  # 1 for pass
 
-    def get_symmetries(self, board, pi, last_action):
-        # mirror, rotational
-        assert(len(pi) == self.action_size)  # 1 for pass
+        new_action = 0
+        expanded_mcts_prob = np.zeros(20736)
+        l = [(board, pi, last_action)]
 
-        pi_board = np.reshape(pi, (self.n, self.n))
-        last_action_board = np.zeros((self.n, self.n))
-        last_action_board[last_action // self.n][last_action % self.n] = 1
-        l = []
+        action_part_i = last_action & 0xf0f0f0
+        action_part_j = last_action & 0x0f0f0f
+        for i in range(3):
+            j = action_part_j & 0x0f
+            new_action = (new_action << 8) + (9 - j)
+            action_part_j >>= 8
+        new_action |= action_part_i
+        
+        chess_1st_prob = pi[:5184]
+        chess_2nd_prob = pi[5184:10368]
+        chess_3rd_prob = pi[10368:15552]
+        chess_4th_prob = pi[15552:]
+        chess_prob = zip(chess_1st_prob, chess_2nd_prob, chess_3rd_prob, chess_4th_prob)
 
-        for i in range(1, 5):
-            for j in [True, False]:
-                newB = np.rot90(board, i)
-                newPi = np.rot90(pi_board, i)
-                newAction = np.rot90(last_action_board, i)
-                if j:
-                    newB = np.fliplr(newB)
-                    newPi = np.fliplr(newPi)
-                    newAction = np.fliplr(newAction)
-                l += [(newB, newPi.ravel(), np.argmax(newAction) if last_action != -1 else -1)]
+        ctr = 0
+        chess = []
+        for i in range(10):
+            for j in range(10):
+                if board[i][j] == cur_color:
+                    chess.append((i, j, ctr))
+                    ctr += 1
+                    if ctr == 4:
+                        break
+        chess.sort(key=lambda x: (9 - x[0]) * 10 + x[1], reverse=True)
+        
+        new_chess_offset = np.array([0, 0, 0, 0])
+        for i, v in enumerate(chess):
+            new_chess_offset[v[2]] =  i * 5184
+        for i, prob in enumerate(chess_prob):
+            expanded_mcts_prob[new_chess_offset + flip_map[i]] = prob
+
+        l += [(np.fliplr(board), expanded_mcts_prob, new_action if last_action != -1 else -1)]
+        #         l += [(newB, newPi.ravel(), np.argmax(newAction) if last_action != -1 else -1)]
         return l
 
     def play_with_human(self, human_first=True, checkpoint_name="best_checkpoint"):
@@ -289,12 +321,12 @@ class Leaner():
 
         # load best model
         libtorch_best = NeuralNetwork('./models/best_checkpoint.pt', self.libtorch_use_gpu, 12)
-        mcts_best = MCTS(libtorch_best, self.num_mcts_threads * 3, \
-             self.c_puct, self.num_mcts_sims * 6, self.c_virtual_loss, self.action_size)
+        mcts_best = MCTS(libtorch_best, self.num_mcts_threads * 3,
+                         self.c_puct, self.num_mcts_sims * 6, self.c_virtual_loss, self.action_size)
 
         # create gomoku game
         human_color = self.gomoku_gui.get_human_color()
-        gomoku = Gomoku(self.n, self.n_in_row, human_color if human_first else -human_color)
+        gomoku = Amazon(human_color if human_first else -human_color)
 
         players = ["alpha", None, "human"] if human_color == 1 else ["human", None, "alpha"]
         player_index = human_color if human_first else -human_color

@@ -1,7 +1,6 @@
-# coding: utf-8
+# -*- coding: utf-8 -*-
 import os
 import sys
-sys.path.append('../build')
 
 from library import Gomoku, MCTS
 import numpy as np

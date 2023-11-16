@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
-sys.path.append('../src')
 
 import numpy as np
 import threading
 import gomoku_gui
-
 
 if __name__ == "__main__":
     gomoku_gui = gomoku_gui.GomokuGUI(10)

@@ -1,23 +1,23 @@
 #pragma once
 
-#include <unordered_map>
-#include <string>
-#include <vector>
-#include <thread>
 #include <atomic>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
-#include <gomoku.h>
-#include <thread_pool.h>
+#include <amazon.h>
 #include <libtorch.h>
+#include <thread_pool.h>
 
 class TreeNode {
- public:
+public:
   // friend class can access private variables
   friend class MCTS;
 
   TreeNode();
   TreeNode(const TreeNode &node);
-  TreeNode(TreeNode *parent, double p_sa, unsigned action_size);
+  TreeNode(TreeNode *parent, double p_sa);
 
   TreeNode &operator=(const TreeNode &p);
 
@@ -29,10 +29,10 @@ class TreeNode {
                    unsigned int sum_n_visited) const;
   inline bool get_is_leaf() const { return this->is_leaf; }
 
- private:
+private:
   // store tree
   TreeNode *parent;
-  std::vector<TreeNode *> children;
+  std::unordered_map<unsigned int, TreeNode *> children;
   bool is_leaf;
   std::mutex lock;
 
@@ -43,15 +43,15 @@ class TreeNode {
 };
 
 class MCTS {
- public:
+public:
   MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
        unsigned int num_mcts_sims, double c_virtual_loss,
        unsigned int action_size);
-  std::vector<double> get_action_probs(Gomoku *gomoku, double temp = 1e-3);
+  std::vector<double> get_action_probs(Amazon *amazon, double temp = 1e-3);
   void update_with_move(int last_move);
 
- private:
-  void simulate(std::shared_ptr<Gomoku> game);
+private:
+  void simulate(std::shared_ptr<Amazon> game);
   static void tree_deleter(TreeNode *t);
 
   // variables

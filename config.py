@@ -1,8 +1,8 @@
 config = {
     # gomoku
-    'n': 15,                                    # board size
+    'n': 10,                                    # board size
     'n_in_row': 5,                              # n in row
-    'use_gui': True,                           # show gomoku gui in training mode
+    'use_gui': False,                           # show gomoku gui in training mode
 
     # mcts
     'libtorch_use_gpu' : True,                  # libtorch use cuda
@@ -26,7 +26,7 @@ config = {
     'num_train_threads': 10,                    # self play in parallel
     'num_explore': 5,                           # explore step in a game
     'temp': 1,                                  # temperature
-    'dirichlet_alpha': 0.3,                     # action noise in self play games
+    'dirichlet_alpha': 0.006,                   # action noise in self play games
     'update_threshold': 0.55,                   # update model threshold
     'num_contest': 10,                          # new/old model compare times
     'check_freq': 20,                           # test model frequency
@@ -37,4 +37,4 @@ config = {
 }
 
 # action size
-config['action_size'] = config['n'] ** 2
+config['action_size'] = 20736

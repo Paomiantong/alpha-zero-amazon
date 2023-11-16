@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.8.0)
 project(library)
 
+set(CMAKE_CUDA_ARCHITECTURES 60)
+
+# for vsc cpp tools
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # option
 option(WRAP_LIB "wrap library" ON)
 option(UNIT_TEST "unit test" OFF)
@@ -18,17 +23,17 @@ find_package(SWIG REQUIRED)
 include(${SWIG_USE_FILE})
 
 # find python
-find_package(PythonLibs 3.6 REQUIRED)
+find_package(PythonLibs 3.8 REQUIRED)
 include_directories(${PYTHON_INCLUDE_PATH})
 
 # add sources
-include_directories(./src)
-aux_source_directory(./src SOURCES)
+include_directories(./src/library)
+aux_source_directory(./src/library SOURCES)
 
 # swig
 if(WRAP_LIB)
-    set_property(SOURCE ./src/library.i PROPERTY CPLUSPLUS ON)
-    swig_add_library(library TYPE SHARED LANGUAGE python SOURCES ./src/library.i ${SOURCES})
+    set_property(SOURCE ./src/library/library.i PROPERTY CPLUSPLUS ON)
+    swig_add_library(library TYPE SHARED LANGUAGE python SOURCES ./src/library/library.i ${SOURCES})
     swig_link_libraries(library ${PYTHON_LIBRARIES} ${TORCH_LIBRARIES})
 endif()
 

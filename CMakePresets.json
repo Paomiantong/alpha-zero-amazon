@@ -1,0 +1,29 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "library-x64-Release",
+            "generator": "Ninja",
+            "binaryDir": "${workspaceRoot}/src/library/build",
+            "cacheVariables": {
+                "CMAKE_PREFIX_PATH": "/opt/conda/envs/pytorch/lib/python3.8/site-packages/torch/share/cmake",
+                "PYTHON_EXECUTABLE": "/opt/conda/envs/pytorch/bin/python3",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            },
+            "environment": {
+                "LD_LIBRARY_PATH": "/usr/local/cuda-11.3/lib64",
+                "PATH": "/root/.cache/JetBrains/RemoteDev/dist/2203e709e1a54_CLion-233.11555.2/bin/ninja/linux/x64:/usr/local/cuda-11.3/bin:$penv{PATH}"
+            }
+        },
+        {
+            "name": "test-x64-Debug",
+            "inherits": "library-x64-Release",
+            "binaryDir": "${workspaceRoot}/test/build",
+            "cacheVariables": {
+                "WRAP_LIB": false,
+                "UNIT_TEST": true,
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ]
+}

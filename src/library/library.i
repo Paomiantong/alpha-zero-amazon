@@ -1,7 +1,7 @@
 %module(threads="1") library
 
 %{
-#include "gomoku.h"
+#include "amazon.h"
 #include "libtorch.h"
 #include "mcts.h"
 %}
@@ -16,7 +16,7 @@ namespace std {
 
 %include "std_string.i"
 
-%include "gomoku.h"
+%include "amazon.h"
 %include "mcts.h"
 
 class NeuralNetwork {

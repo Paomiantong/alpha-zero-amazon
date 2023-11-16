@@ -29,11 +29,11 @@ class ResidualBlock(nn.Module):
         self.conv2 = conv3x3(out_channels, out_channels)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
-        self.downsample = False
-        if in_channels != out_channels or stride != 1:
-            self.downsample = True
-            self.downsample_conv = conv3x3(in_channels, out_channels, stride=stride)
-            self.downsample_bn = nn.BatchNorm2d(out_channels)
+        # self.downsample = False
+        # if in_channels != out_channels or stride != 1:
+        #     self.downsample = True
+        #     self.downsample_conv = conv3x3(in_channels, out_channels, stride=stride)
+        #     self.downsample_bn = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
         residual = x
@@ -43,9 +43,9 @@ class ResidualBlock(nn.Module):
         out = self.conv2(out)
         out = self.bn2(out)
 
-        if self.downsample:
-            residual = self.downsample_conv(residual)
-            residual = self.downsample_bn(residual)
+        # if self.downsample:
+        #     residual = self.downsample_conv(residual)
+        #     residual = self.downsample_bn(residual)
 
         out += residual
         out = self.relu(out)
@@ -59,8 +59,16 @@ class NeuralNetWork(nn.Module):
     def __init__(self, num_layers, num_channels, n, action_size):
         super(NeuralNetWork, self).__init__()
 
+        self.initial_block = nn.Sequential(
+            nn.Conv2d(5, num_channels, 3, stride=1, padding=1),
+            nn.BatchNorm2d(num_channels),
+            nn.ReLU()
+            )
+
         # residual block
-        res_list = [ResidualBlock(3, num_channels)] + [ResidualBlock(num_channels, num_channels) for _ in range(num_layers - 1)]
+        # res_list = [ResidualBlock(3, num_channels)] + [ResidualBlock(num_channels, num_channels) for _ in
+        #                                                range(num_layers - 1)]
+        res_list =  [ResidualBlock(num_channels, num_channels) for _ in range(num_layers)]
         self.res_layers = nn.Sequential(*res_list)
 
         # policy head
@@ -80,8 +88,11 @@ class NeuralNetWork(nn.Module):
         self.tanh = nn.Tanh()
 
     def forward(self, inputs):
+        # initial block
+        out = self.initial_block(inputs)
+        
         # residual block
-        out = self.res_layers(inputs)
+        out = self.res_layers(out)
 
         # policy head
         p = self.p_conv(out)
@@ -127,7 +138,7 @@ class AlphaLoss(nn.Module):
         return value_loss + policy_loss
 
 
-class NeuralNetWorkWrapper():
+class NeuralNetWorkWrapper:
     """train and predict
     """
 
@@ -159,9 +170,9 @@ class NeuralNetWorkWrapper():
             train_data = random.sample(example_buffer, batch_size)
 
             # extract train data
-            board_batch, last_action_batch, cur_player_batch, p_batch, v_batch = list(zip(*train_data))
+            board_batch, last_action_batch, cur_player_batch, first_hand_batch, p_batch, v_batch = list(zip(*train_data))
 
-            state_batch = self._data_convert(board_batch, last_action_batch, cur_player_batch)
+            state_batch = self._data_convert(board_batch, last_action_batch, cur_player_batch, first_hand_batch)
             p_batch = torch.Tensor(p_batch).cuda() if self.train_use_gpu else torch.Tensor(p_batch)
             v_batch = torch.Tensor(v_batch).unsqueeze(
                 1).cuda() if self.train_use_gpu else torch.Tensor(v_batch).unsqueeze(1)
@@ -189,8 +200,8 @@ class NeuralNetWorkWrapper():
         """predict p and v by raw input
            return numpy
         """
-        board_batch, last_action_batch, cur_player_batch = list(zip(*feature_batch))
-        states = self._data_convert(board_batch, last_action_batch, cur_player_batch)
+        board_batch, last_action_batch, cur_player_batch, first_hand_batch = list(zip(*feature_batch))
+        states = self._data_convert(board_batch, last_action_batch, cur_player_batch, first_hand_batch)
 
         self.neural_network.eval()
         log_ps, vs = self.neural_network(states)
@@ -206,31 +217,45 @@ class NeuralNetWorkWrapper():
         log_ps, vs = self.neural_network(state_batch)
 
         return np.exp(log_ps.cpu().detach().numpy()), vs.cpu().detach().numpy()
-
-    def _data_convert(self, board_batch, last_action_batch, cur_player_batch):
+    #TODO: 转化数据
+    def _data_convert(self, board_batch, last_action_batch, cur_player_batch, first_hand_batch):
         """convert data format
            return tensor
         """
         n = self.n
-
+        # UPDATE: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow.
+        # Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor.
         board_batch = torch.Tensor(board_batch).unsqueeze(1)
-        state0 = (board_batch > 0).float()
-        state1 = (board_batch < 0).float()
+        state0 = (board_batch == 1).float()
+        state1 = (board_batch == 2).float()
+        state2 = (board_batch == 3).float()
 
-        state2 = torch.zeros((len(last_action_batch), 1, n, n)).float()
+        state3 = torch.zeros((len(last_action_batch), 1, n, n)).float()
+        #TODO: 确认是否先手
+        state4 = torch.zeros((len(cur_player_batch), 1, n, n)).float()
 
         for i in range(len(board_batch)):
-            if cur_player_batch[i] == -1:
+            if cur_player_batch[i] == 2:
                 temp = state0[i].clone()
                 state0[i].copy_(state1[i])
                 state1[i].copy_(temp)
 
             last_action = last_action_batch[i]
             if last_action != -1:
-                x, y = last_action // self.n, last_action % self.n
-                state2[i][0][x][y] = 1
+                k = last_action
+                ctr = 3
+                while k != 0:
+                    y = (k & 0xf0) >> 4
+                    x = k & 0x0f
+                    state3[i][0][y][x] = ctr
+                    k >>= 8
+                    ctr -= 1
+                    # print(f"{y},{x}")
+            
+            if cur_player_batch[i] == first_hand_batch[i]:
+                state4[i][0][:,:] = 1
 
-        res =  torch.cat((state0, state1, state2), dim=1)
+        res = torch.cat((state0, state1, state2, state3, state4), dim=1)
         # res = torch.cat((state0, state1), dim=1)
         return res.cuda() if self.train_use_gpu else res
 
@@ -258,7 +283,7 @@ class NeuralNetWorkWrapper():
             os.mkdir(folder)
 
         filepath = os.path.join(folder, filename)
-        state = {'network':self.neural_network.state_dict(), 'optim':self.optim.state_dict()}
+        state = {'network': self.neural_network.state_dict(), 'optim': self.optim.state_dict()}
         torch.save(state, filepath)
 
         # save torchscript
@@ -267,10 +292,10 @@ class NeuralNetWorkWrapper():
 
         if self.libtorch_use_gpu:
             self.neural_network.cuda()
-            example = torch.rand(1, 3, self.n, self.n).cuda()
+            example = torch.rand(1, 5, self.n, self.n).cuda()
         else:
             self.neural_network.cpu()
-            example = torch.rand(1, 3, self.n, self.n).cpu()
+            example = torch.rand(1, 5, self.n, self.n).cpu()
 
         traced_script_module = torch.jit.trace(self.neural_network, example)
         traced_script_module.save(filepath)

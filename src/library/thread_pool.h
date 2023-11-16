@@ -1,13 +1,13 @@
 #pragma once
 
-#include <vector>
-#include <queue>
-#include <thread>
 #include <atomic>
 #include <condition_variable>
-#include <future>
 #include <functional>
+#include <future>
+#include <queue>
 #include <stdexcept>
+#include <thread>
+#include <vector>
 
 class ThreadPool {
 public:
@@ -59,7 +59,7 @@ public:
   }
 
   template <class F, class... Args>
-  auto commit(F &&f, Args &&... args) -> std::future<decltype(f(args...))> {
+  auto commit(F &&f, Args &&...args) -> std::future<decltype(f(args...))> {
     // commit a task, return std::future
     // example: .commit(std::bind(&Dog::sayHello, &dog));
 

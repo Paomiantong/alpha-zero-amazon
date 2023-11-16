@@ -1,30 +1,21 @@
-#include <math.h>
 #include <float.h>
-#include <numeric>
 #include <iostream>
+#include <math.h>
+#include <numeric>
 
 #include <mcts.h>
 
 // TreeNode
 TreeNode::TreeNode()
-    : parent(nullptr),
-      is_leaf(true),
-      virtual_loss(0),
-      n_visited(0),
-      p_sa(0),
+    : parent(nullptr), is_leaf(true), virtual_loss(0), n_visited(0), p_sa(0),
       q_sa(0) {}
 
-TreeNode::TreeNode(TreeNode *parent, double p_sa, unsigned int action_size)
-    : parent(parent),
-      children(action_size, nullptr),
-      is_leaf(true),
-      virtual_loss(0),
-      n_visited(0),
-      q_sa(0),
-      p_sa(p_sa) {}
+TreeNode::TreeNode(TreeNode *parent, double p_sa)
+    : parent(parent), children(), is_leaf(true), virtual_loss(0), n_visited(0),
+      q_sa(0), p_sa(p_sa) {}
 
 TreeNode::TreeNode(
-    const TreeNode &node) {  // because automic<>, define copy function
+    const TreeNode &node) { // because automic<>, define copy function
   // struct
   this->parent = node.parent;
   this->children = node.children;
@@ -60,19 +51,19 @@ unsigned int TreeNode::select(double c_puct, double c_virtual_loss) {
   unsigned int best_move = 0;
   TreeNode *best_node;
 
-  for (unsigned int i = 0; i < this->children.size(); i++) {
+  for (const auto &child : this->children) {
     // empty node
-    if (children[i] == nullptr) {
+    if (child.second == nullptr) {
       continue;
     }
 
     unsigned int sum_n_visited = this->n_visited.load() + 1;
     double cur_value =
-        children[i]->get_value(c_puct, c_virtual_loss, sum_n_visited);
+        child.second->get_value(c_puct, c_virtual_loss, sum_n_visited);
     if (cur_value > best_value) {
       best_value = cur_value;
-      best_move = i;
-      best_node = children[i];
+      best_move = child.first;
+      best_node = child.second;
     }
   }
 
@@ -88,14 +79,14 @@ void TreeNode::expand(const std::vector<double> &action_priors) {
     std::lock_guard<std::mutex> lock(this->lock);
 
     if (this->is_leaf) {
-      unsigned int action_size = this->children.size();
+      unsigned int action_size = 20736;
 
       for (unsigned int i = 0; i < action_size; i++) {
         // illegal action
         if (abs(action_priors[i] - 0) < FLT_EPSILON) {
           continue;
         }
-        this->children[i] = new TreeNode(this, action_priors[i], action_size);
+        this->children[i] = new TreeNode(this, action_priors[i]);
       }
 
       // not leaf
@@ -142,16 +133,13 @@ double TreeNode::get_value(double c_puct, double c_virtual_loss,
 }
 
 // MCTS
-MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num, double c_puct,
-           unsigned int num_mcts_sims, double c_virtual_loss,
+MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num,
+           double c_puct, unsigned int num_mcts_sims, double c_virtual_loss,
            unsigned int action_size)
-    : neural_network(neural_network),
-      thread_pool(new ThreadPool(thread_num)),
-      c_puct(c_puct),
-      num_mcts_sims(num_mcts_sims),
-      c_virtual_loss(c_virtual_loss),
-      action_size(action_size),
-      root(new TreeNode(nullptr, 1., action_size), MCTS::tree_deleter){}
+    : neural_network(neural_network), thread_pool(new ThreadPool(thread_num)),
+      c_puct(c_puct), num_mcts_sims(num_mcts_sims),
+      c_virtual_loss(c_virtual_loss), action_size(action_size),
+      root(new TreeNode(nullptr, 1.), MCTS::tree_deleter) {}
 
 void MCTS::update_with_move(int last_action) {
   auto old_root = this->root.get();
@@ -165,19 +153,19 @@ void MCTS::update_with_move(int last_action) {
 
     this->root.reset(new_node);
   } else {
-    this->root.reset(new TreeNode(nullptr, 1., this->action_size));
+    this->root.reset(new TreeNode(nullptr, 1.));
   }
 }
-
+// BUG: 内存泄漏?
 void MCTS::tree_deleter(TreeNode *t) {
   if (t == nullptr) {
     return;
   }
 
   // remove children
-  for (unsigned int i = 0; i < t->children.size(); i++) {
-    if (t->children[i]) {
-      tree_deleter(t->children[i]);
+  for (const auto &child : t->children) {
+    if (child.second) {
+      tree_deleter(child.second);
     }
   }
 
@@ -185,13 +173,13 @@ void MCTS::tree_deleter(TreeNode *t) {
   delete t;
 }
 
-std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
+std::vector<double> MCTS::get_action_probs(Amazon *amazon, double temp) {
   // submit simulate tasks to thread_pool
   std::vector<std::future<void>> futures;
 
   for (unsigned int i = 0; i < this->num_mcts_sims; i++) {
-    // copy gomoku
-    auto game = std::make_shared<Gomoku>(*gomoku);
+    // copy amazon
+    auto game = std::make_shared<Amazon>(*amazon);
     auto future =
         this->thread_pool->commit(std::bind(&MCTS::simulate, this, game));
 
@@ -205,7 +193,7 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   }
 
   // calculate probs
-  std::vector<double> action_probs(gomoku->get_action_size(), 0);
+  std::vector<double> action_probs(amazon->get_action_size(), 0);
   const auto &children = this->root->children;
 
   // greedy
@@ -213,10 +201,10 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
     unsigned int max_count = 0;
     unsigned int best_action = 0;
 
-    for (unsigned int i = 0; i < children.size(); i++) {
-      if (children[i] && children[i]->n_visited.load() > max_count) {
-        max_count = children[i]->n_visited.load();
-        best_action = i;
+    for (const auto &child : children) {
+      if (child.second && child.second->n_visited.load() > max_count) {
+        max_count = child.second->n_visited.load();
+        best_action = child.first;
       }
     }
 
@@ -226,10 +214,11 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   } else {
     // explore
     double sum = 0;
-    for (unsigned int i = 0; i < children.size(); i++) {
-      if (children[i] && children[i]->n_visited.load() > 0) {
-        action_probs[i] = pow(children[i]->n_visited.load(), 1 / temp);
-        sum += action_probs[i];
+    for (const auto &child : children) {
+      if (child.second && child.second->n_visited.load() > 0) {
+        action_probs[child.first] =
+            pow(child.second->n_visited.load(), 1 / temp);
+        sum += action_probs[child.first];
       }
     }
 
@@ -241,7 +230,7 @@ std::vector<double> MCTS::get_action_probs(Gomoku *gomoku, double temp) {
   }
 }
 
-void MCTS::simulate(std::shared_ptr<Gomoku> game) {
+void MCTS::simulate(std::shared_ptr<Amazon> game) {
   // execute one simulation
   auto node = this->root.get();
 
