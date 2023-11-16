@@ -219,13 +219,13 @@ class Leaner:
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.num_train_threads) as executor:
             futures = [executor.submit(
-                self._contest, network1, network2, 1 if k <= num_contest // 2 else -1, k == 1) for k in
+                self._contest, network1, network2, 1 if k <= num_contest // 2 else 2, k == 1) for k in
                 range(1, num_contest + 1)]
             for f in futures:
                 winner = f.result()
                 if winner == 1:
                     one_won += 1
-                elif winner == -1:
+                elif winner == 2:
                     two_won += 1
                 else:
                     draws += 1
@@ -233,6 +233,8 @@ class Leaner:
         return one_won, two_won, draws
 
     def _contest(self, network1, network2, first_player, show):
+        # TODO: 记得改回来
+        show = False
         # create MCTS
         player1 = MCTS(network1, self.num_mcts_threads, self.c_puct,
                        self.num_mcts_sims, self.c_virtual_loss, self.action_size)
@@ -241,7 +243,7 @@ class Leaner:
 
         # prepare
         players = [player2, None, player1]
-        player_index = first_player
+        player_index = 1 if first_player == 1 else -1
         gomoku = Amazon(first_player)
         if show:
             self.gomoku_gui.reset_status()
@@ -270,6 +272,7 @@ class Leaner:
 
             # next player
             player_index = -player_index
+
     # Done：对称
     def get_symmetries(self, board, pi, last_action, cur_color):
         # mirror, nop rotational
@@ -286,7 +289,7 @@ class Leaner:
             new_action = (new_action << 8) + (9 - j)
             action_part_j >>= 8
         new_action |= action_part_i
-        
+
         chess_1st_prob = pi[:5184]
         chess_2nd_prob = pi[5184:10368]
         chess_3rd_prob = pi[10368:15552]
@@ -303,10 +306,10 @@ class Leaner:
                     if ctr == 4:
                         break
         chess.sort(key=lambda x: (9 - x[0]) * 10 + x[1], reverse=True)
-        
+
         new_chess_offset = np.array([0, 0, 0, 0])
         for i, v in enumerate(chess):
-            new_chess_offset[v[2]] =  i * 5184
+            new_chess_offset[v[2]] = i * 5184
         for i, prob in enumerate(chess_prob):
             expanded_mcts_prob[new_chess_offset + flip_map[i]] = prob
 

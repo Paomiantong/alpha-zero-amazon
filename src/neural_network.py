@@ -63,12 +63,12 @@ class NeuralNetWork(nn.Module):
             nn.Conv2d(5, num_channels, 3, stride=1, padding=1),
             nn.BatchNorm2d(num_channels),
             nn.ReLU()
-            )
+        )
 
         # residual block
         # res_list = [ResidualBlock(3, num_channels)] + [ResidualBlock(num_channels, num_channels) for _ in
         #                                                range(num_layers - 1)]
-        res_list =  [ResidualBlock(num_channels, num_channels) for _ in range(num_layers)]
+        res_list = [ResidualBlock(num_channels, num_channels) for _ in range(num_layers)]
         self.res_layers = nn.Sequential(*res_list)
 
         # policy head
@@ -90,7 +90,7 @@ class NeuralNetWork(nn.Module):
     def forward(self, inputs):
         # initial block
         out = self.initial_block(inputs)
-        
+
         # residual block
         out = self.res_layers(out)
 
@@ -170,7 +170,8 @@ class NeuralNetWorkWrapper:
             train_data = random.sample(example_buffer, batch_size)
 
             # extract train data
-            board_batch, last_action_batch, cur_player_batch, first_hand_batch, p_batch, v_batch = list(zip(*train_data))
+            board_batch, last_action_batch, cur_player_batch, first_hand_batch, p_batch, v_batch = list(
+                zip(*train_data))
 
             state_batch = self._data_convert(board_batch, last_action_batch, cur_player_batch, first_hand_batch)
             p_batch = torch.Tensor(p_batch).cuda() if self.train_use_gpu else torch.Tensor(p_batch)
@@ -217,7 +218,8 @@ class NeuralNetWorkWrapper:
         log_ps, vs = self.neural_network(state_batch)
 
         return np.exp(log_ps.cpu().detach().numpy()), vs.cpu().detach().numpy()
-    #TODO: 转化数据
+
+    # TODO: 转化数据
     def _data_convert(self, board_batch, last_action_batch, cur_player_batch, first_hand_batch):
         """convert data format
            return tensor
@@ -231,7 +233,7 @@ class NeuralNetWorkWrapper:
         state2 = (board_batch == 3).float()
 
         state3 = torch.zeros((len(last_action_batch), 1, n, n)).float()
-        #TODO: 确认是否先手
+        # TODO: 确认是否先手
         state4 = torch.zeros((len(cur_player_batch), 1, n, n)).float()
 
         for i in range(len(board_batch)):
@@ -251,9 +253,9 @@ class NeuralNetWorkWrapper:
                     k >>= 8
                     ctr -= 1
                     # print(f"{y},{x}")
-            
+
             if cur_player_batch[i] == first_hand_batch[i]:
-                state4[i][0][:,:] = 1
+                state4[i][0][:, :] = 1
 
         res = torch.cat((state0, state1, state2, state3, state4), dim=1)
         # res = torch.cat((state0, state1), dim=1)

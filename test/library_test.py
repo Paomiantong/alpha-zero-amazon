@@ -6,7 +6,6 @@ from library import Gomoku, MCTS
 import numpy as np
 import time
 
-
 if __name__ == "__main__":
     gomoku = Gomoku(15, 5, 1)
     gomoku.execute_move(0 + 40)
@@ -24,9 +23,9 @@ if __name__ == "__main__":
 
     print("RUNNING")
     while True:
-        time_start=time.time()
+        time_start = time.time()
         res = mcts.get_action_probs(gomoku, 1)
-        time_end=time.time()
+        time_end = time.time()
         print('get_action_probs', time_end - time_start)
 
         print(list(res))

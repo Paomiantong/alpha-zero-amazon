@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
+
 sys.path.append('../src')
 sys.path.append('../build')
 
@@ -30,30 +31,30 @@ if __name__ == "__main__":
     policy_value_net = neural_network.NeuralNetWorkWrapper(lr, l2, num_layers, num_channels, n, action_size)
 
     # test data convert
-    board_batch = [[[0,0,0,2,0,0,2,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [2,0,0,0,0,0,0,0,0,2],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [1,0,0,0,0,0,0,0,0,1],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,1,0,0,1,0,0,0]],
-                   [[0,0,0,2,0,0,2,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [2,0,0,0,0,0,0,0,0,2],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [0,0,0,0,0,0,0,0,0,1],
-                    [0,0,0,0,0,0,0,0,0,0],
-                    [3,0,0,0,0,0,0,0,0,0],
-                    [1,0,0,1,0,0,1,0,0,0]]]
+    board_batch = [[[0, 0, 0, 2, 0, 0, 2, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [2, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 1, 0, 0, 1, 0, 0, 0]],
+                   [[0, 0, 0, 2, 0, 0, 2, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [2, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                    [1, 0, 0, 1, 0, 0, 1, 0, 0, 0]]]
     last_action_batch = [-1, 6328448]
     cur_player_batch = [1, 2]
     first_hand_batch = [1, 1]
-    
+
     state_batch = policy_value_net._data_convert(board_batch, last_action_batch, cur_player_batch, first_hand_batch)
     print('state \n', state_batch)
 
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     v_batch = torch.Tensor([0.5, 0.5]).cuda()
 
     log_p, v = policy_value_net.neural_network(state_batch.cuda())
-    #print('p, v \n', np.exp(log_p.cpu().detach().numpy()), v.cpu())
+    # print('p, v \n', np.exp(log_p.cpu().detach().numpy()), v.cpu())
 
     loss = policy_value_net.alpha_loss(log_p, v, p_batch, v_batch.unsqueeze(1))
 
@@ -110,12 +111,13 @@ if __name__ == "__main__":
     # gomoku.execute_move(12)
     # gomoku.execute_move(15)
 
-    feature_batch = [(tuple_2d_to_numpy_2d(gomoku.get_board()), gomoku.get_last_move(), gomoku.get_current_color(), gomoku.first_hand_now())]
+    feature_batch = [(tuple_2d_to_numpy_2d(gomoku.get_board()), gomoku.get_last_move(), gomoku.get_current_color(),
+                      gomoku.first_hand_now())]
     print(feature_batch)
     # print(nn.infer(feature_batch))
 
     # gomoku.execute_move(24)
-    feature_batch = [(tuple_2d_to_numpy_2d(gomoku.get_board()), gomoku.get_last_move(), gomoku.get_current_color(), gomoku.first_hand_now())]
+    feature_batch = [(tuple_2d_to_numpy_2d(gomoku.get_board()), gomoku.get_last_move(), gomoku.get_current_color(),
+                      gomoku.first_hand_now())]
     print(feature_batch)
     # print(nn.infer(feature_batch))
-

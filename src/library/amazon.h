@@ -49,6 +49,7 @@ public:
   inline bool first_hand_now() const {
     return this->cur_color == this->first_hand;
   }
+
 private:
   void resort_amazon_pos();
 
@@ -59,5 +60,5 @@ private:
                                     {{0, 3}, {0, 6}, {3, 0}, {3, 9}}};
   int cur_color; // current player's color 1:Black and 2:White
   int first_hand;
-  move_type last_move; // last move
+  move_type last_move;    // last move
 };
