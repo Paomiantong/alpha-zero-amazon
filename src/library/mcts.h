@@ -49,6 +49,11 @@ public:
        unsigned int action_size);
   std::vector<double> get_action_probs(Amazon *amazon, double temp = 1e-3);
   void update_with_move(int last_move);
+//   ~MCTS() {
+//     std::cout << "~MCTS()" << std::endl;
+//     root.release();
+//     thread_pool.release();
+//   }
 
 private:
   void simulate(std::shared_ptr<Amazon> game);

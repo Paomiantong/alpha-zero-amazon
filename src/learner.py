@@ -3,6 +3,7 @@ from os import path, mkdir
 import threading
 import time
 import math
+from typing import List
 import numpy as np
 import pickle
 import concurrent.futures
@@ -11,18 +12,19 @@ from functools import reduce
 
 import sys
 
-sys.path.append('../build')
+
 from library import MCTS, Amazon, NeuralNetwork
 
 from neural_network import NeuralNetWorkWrapper
 from gomoku_gui import GomokuGUI
 from expand_map import flip_map
+from message import push as push_message
 
 
 def tuple_2d_to_numpy_2d(tuple_2d):
     # help function
     # convert type
-    res = [None] * len(tuple_2d)
+    res:List = [None] * len(tuple_2d)
     for i, tuple_1d in enumerate(tuple_2d):
         res[i] = list(tuple_1d)
     return np.array(res)
@@ -105,6 +107,7 @@ class Leaner:
 
             # prepare train data
             self.examples_buffer.append(itr_examples)
+            # print(f'Buffer length:{len(self.examples_buffer)}, in memory size: {sys.getsizeof(self.examples_buffer)}')
             train_data = reduce(lambda a, b: a + b, self.examples_buffer)
             random.shuffle(train_data)
 
@@ -128,9 +131,11 @@ class Leaner:
 
                 if one_won + two_won > 0 and float(one_won) / (one_won + two_won) > self.update_threshold:
                     print('ACCEPTING NEW MODEL')
+                    push_message('ACCEPTING NEW MODEL', "NEW/PREV WINS : %d / %d ; DRAWS : %d" % (one_won, two_won, draws))
                     self.nnet.save_model('models', "best_checkpoint")
                 else:
                     print('REJECTING NEW MODEL')
+                    push_message('REJECTING NEW MODEL', "NEW/PREV WINS : %d / %d ; DRAWS : %d" % (one_won, two_won, draws))
 
                 # release gpu memory
                 del libtorch_current
@@ -198,6 +203,7 @@ class Leaner:
             if show:
                 self.gomoku_gui.execute_move(cur_player, action)
             gomoku.execute_move(action)
+            # TODO: 是否只对当前player进行更新
             player1.update_with_move(action)
             player2.update_with_move(action)
 
@@ -207,6 +213,8 @@ class Leaner:
             # is ended
             ended, winner = gomoku.get_game_status()
             if ended == 1:
+                del player1
+                del player2
                 # b, last_action, cur_player, firsthand, p, v
                 return [(x[0], x[1], x[2], x[3], x[4], 1 if x[2] == winner else -1) for x in train_examples]
 
@@ -267,6 +275,7 @@ class Leaner:
                 return winner
 
             # update search tree
+            # TODO: 是否只对当前player进行更新
             player1.update_with_move(best_move)
             player2.update_with_move(best_move)
 

@@ -140,7 +140,7 @@ MCTS::MCTS(NeuralNetwork *neural_network, unsigned int thread_num,
       c_puct(c_puct), num_mcts_sims(num_mcts_sims),
       c_virtual_loss(c_virtual_loss), action_size(action_size),
       root(new TreeNode(nullptr, 1.), MCTS::tree_deleter) {}
-
+// TEST: 如果action不存在于MAP中，是否会返回nullptr
 void MCTS::update_with_move(int last_action) {
   auto old_root = this->root.get();
 
@@ -165,6 +165,7 @@ void MCTS::tree_deleter(TreeNode *t) {
   // remove children
   for (const auto &child : t->children) {
     if (child.second) {
+    //   std::cout << child.first << std::endl;
       tree_deleter(child.second);
     }
   }
