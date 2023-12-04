@@ -202,3 +202,12 @@ void Amazon::reset() {
   this->board[0][6] = 2;
   this->board[3][9] = 2;
 }
+
+int Amazon::get_amazon_ind(int i, int j) {
+  auto amzs = amazon_pos[cur_color - 1];
+  for (int ind = 0; ind < 4; ind++) {
+    if (i == amzs[ind][0] && j == amzs[ind][1])
+      return ind;
+  }
+  return -1;
+}

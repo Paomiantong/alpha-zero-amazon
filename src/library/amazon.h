@@ -41,6 +41,7 @@ public:
   std::vector<int> get_game_status();
   void display() const;
   void reset();
+  int get_amazon_ind(int i, int j);
 
   inline unsigned int get_action_size() const { return 20736; }
   inline board_type get_board() const { return this->board; }
@@ -60,5 +61,5 @@ private:
                                     {{0, 3}, {0, 6}, {3, 0}, {3, 9}}};
   int cur_color; // current player's color 1:Black and 2:White
   int first_hand;
-  move_type last_move;    // last move
+  move_type last_move; // last move
 };

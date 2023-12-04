@@ -2,7 +2,7 @@ config = {
     # gomoku
     'n': 10,                                    # board size
     'n_in_row': 5,                              # n in row
-    'use_gui': False,                           # show gomoku gui in training mode
+    'use_gui': True,                           # show gomoku gui in training mode
 
     # mcts
     'libtorch_use_gpu' : True,                  # libtorch use cuda
