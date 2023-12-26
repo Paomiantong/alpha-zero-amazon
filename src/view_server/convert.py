@@ -5193,16 +5193,12 @@ def act_to_str(act):
 
 
 def hex_to_move(amz, hex):
-    hex -= 0x111111
-    return std_hex_to_move(amz, hex)
-
-def std_hex_to_move(amz, hex):
     tmp = [None for _ in range(3)]
     ctr = 2
     while ctr != -1:
-        x = (hex & 0xF0) >> 4
-        y = hex & 0x0F
-        tmp[ctr] = (y, x)
+        i = (hex & 0xF0) >> 4
+        j = hex & 0x0F
+        tmp[ctr] = (i, j)
         hex >>= 8
         ctr -= 1
     ind = amz.get_amazon_ind(*tmp[0])
@@ -5211,16 +5207,3 @@ def std_hex_to_move(amz, hex):
         (tmp[2][0] - tmp[1][0], tmp[2][1] - tmp[1][1]),
     ]
     return ind * 5184 + ACT2ID[act_to_str(act)]
-
-def fix_hex(hex):
-    hex_i = (hex & 0xF0F0F0) >> 4
-    hex_j = (hex & 0x0F0F0F) << 4
-    return (hex_j | hex_i) + 0x111111
-
-
-if __name__ == "__main__":
-    from library import Amazon
-
-    amz = Amazon(1)
-    print(hex_to_move(amz, 0xA72717))
-    print(f"{fix_hex(0x696160):6x}")

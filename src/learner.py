@@ -1,8 +1,6 @@
 from collections import deque
 from os import path, mkdir
 import threading
-import time
-import math
 from typing import List
 import numpy as np
 import pickle
@@ -10,13 +8,11 @@ import concurrent.futures
 import random
 from functools import reduce
 
-import sys
-
-
 from library import MCTS, Amazon, NeuralNetwork
 
 from neural_network import NeuralNetWorkWrapper
-from view_server import view_server
+from view_server.view_server import ViewServer
+from view_server.convert import hex_to_move
 from expand_map import flip_map
 from message import push as push_message
 
@@ -37,7 +33,7 @@ class Leaner:
         self.n = config["n"]
         self.n_in_row = config["n_in_row"]
         self.use_gui = config["use_gui"]
-        self.gomoku_gui = view_server.ViewServer()
+        self.view_server = ViewServer()
         self.action_size = config["action_size"]
 
         # train
@@ -77,7 +73,7 @@ class Leaner:
     def learn(self):
         # start gui
         if self.use_gui:
-            t = threading.Thread(target=self.gomoku_gui.run)
+            t = threading.Thread(target=self.view_server.run)
             t.start()
 
         # train the model by self play
@@ -180,6 +176,9 @@ class Leaner:
                 del libtorch_current
                 del libtorch_best
 
+        if self.use_gui:
+            self.view_server.stop()
+
     def self_play(self, first_color, libtorch, show):
         """
         This function executes one episode of self-play, starting with player 1.
@@ -214,7 +213,7 @@ class Leaner:
         # show = False
 
         if show:
-            self.gomoku_gui.reset_status(first_color)
+            self.view_server.reset_status(first_color)
 
         episode_step = 0
         while True:
@@ -253,12 +252,13 @@ class Leaner:
             # execute move
             action = np.random.choice(len(prob), p=prob)
 
-            if show:
-                self.gomoku_gui.execute_move(action)
             gomoku.execute_move(action)
             # TODO: 是否只对当前player进行更新
             player1.update_with_move(action)
             player2.update_with_move(action)
+
+            if show:
+                self.view_server.execute_move(gomoku.get_last_move())
 
             # next player
             player_index = -player_index
@@ -331,7 +331,7 @@ class Leaner:
         player_index = 1 if first_player == 1 else -1
         gomoku = Amazon(first_player)
         if show:
-            self.gomoku_gui.reset_status(first_player)
+            self.view_server.reset_status(first_player)
 
         # play
         while True:
@@ -344,7 +344,7 @@ class Leaner:
             # execute move
             gomoku.execute_move(best_move)
             if show:
-                self.gomoku_gui.execute_move(best_move)
+                self.view_server.execute_move(gomoku.get_last_move())
 
             # check game status
             ended, winner = gomoku.get_game_status()
@@ -410,9 +410,10 @@ class Leaner:
         return l
 
     def play_with_human(self, human_first=True, checkpoint_name="best_checkpoint"):
-        # gomoku gui
-        t = threading.Thread(target=self.gomoku_gui.run)
-        t.start()
+        if not self.view_server.running:
+            # gomoku gui
+            t = threading.Thread(target=self.view_server.run)
+            t.start()
 
         # load best model
         libtorch_best = NeuralNetwork(
@@ -420,42 +421,44 @@ class Leaner:
         )
         mcts_best = MCTS(
             libtorch_best,
-            self.num_mcts_threads * 3,
+            self.num_mcts_threads * 6,
             self.c_puct,
-            self.num_mcts_sims * 6,
+            self.num_mcts_sims * 20,
             self.c_virtual_loss,
             self.action_size,
         )
 
         # create gomoku game
-        human_color = self.gomoku_gui.get_human_color()
-        gomoku = Amazon(human_color if human_first else -human_color)
+        # human_color = self.view_server.get_human_color()
+        human_color = 2
+        ai_color = 2 if human_color == 1 else 1
+        first_hand = human_color if human_first else ai_color
+        players = ["alpha", None, "human"] if human_first else ["human", None, "alpha"]
+        player_index = 1
 
-        players = (
-            ["alpha", None, "human"] if human_color == 1 else ["human", None, "alpha"]
-        )
-        player_index = human_color if human_first else -human_color
-
-        self.gomoku_gui.reset_status(player_index)
+        gomoku = Amazon(first_hand)
+        self.view_server.reset_status(first_hand)
 
         while True:
             player = players[player_index + 1]
+
+            print(player)
 
             # select move
             if player == "alpha":
                 prob = mcts_best.get_action_probs(gomoku)
                 best_move = int(np.argmax(np.array(list(prob))))
-                self.gomoku_gui.execute_move(best_move)
             else:
-                self.gomoku_gui.set_is_human(True)
+                # TODO: 人类走子的方法
+                self.view_server.notify_human()
                 # wait human action
-                while self.gomoku_gui.get_is_human():
-                    time.sleep(0.1)
-                best_move = self.gomoku_gui.get_human_move()
+                best_move = self.view_server.get_human_move()
+                best_move = hex_to_move(gomoku, best_move)
 
             # execute move
             gomoku.execute_move(best_move)
-
+            # display
+            self.view_server.execute_move(gomoku.get_last_move())
             # check game status
             ended, winner = gomoku.get_game_status()
             if ended == 1:
@@ -468,6 +471,10 @@ class Leaner:
             player_index = -player_index
 
         print("HUMAN WIN" if winner == human_color else "ALPHA ZERO WIN")
+        self.view_server.notification(
+            "HUMAN WIN" if winner == human_color else "ALPHA ZERO WIN", "info"
+        )
+        # self.view_server.stop()
 
     def load_samples(self, folder="models", filename="checkpoint.example"):
         """load self.examples_buffer"""

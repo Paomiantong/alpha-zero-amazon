@@ -60,7 +60,7 @@ std::future<NeuralNetwork::return_type> NeuralNetwork::commit(Amazon *amazon) {
   if (last_move != -1) {
     // calc pos
     int i, j, ctr = 3;
-    for (int k = last_move; k != 0; k >>= 8, ctr--) {
+    for (int k = last_move; ctr > 0; k >>= 8, ctr--) {
       i = (k & 0xf0) >> 4;
       j = k & 0x0f;
       state3[0][0][i][j] = ctr;

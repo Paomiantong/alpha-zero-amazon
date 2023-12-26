@@ -2,8 +2,8 @@
 import sys
 import traceback
 
-sys.path.append('..')
-sys.path.append('../src')
+sys.path.append("..")
+sys.path.append("../src")
 
 import learner
 from message import push
@@ -17,15 +17,22 @@ if __name__ == "__main__":
     alpha_zero = learner.Leaner(config.config)
 
     if sys.argv[1] == "train":
-        push('Start', 'Train start')
+        push("Start", "Train start")
         try:
             alpha_zero.learn()
         except:
             exc = traceback.format_exc()
             print(exc)
-            push('Error', exc)
-        push('End', 'Train end')
+            push("Error", exc)
+            alpha_zero.view_server.stop()
+        push("End", "Train end")
     elif sys.argv[1] == "play":
-        for i in range(10):
-            print("GAME: {}".format(i + 1))
-            alpha_zero.play_with_human(human_first=i % 2)
+        try:
+            for i in range(10):
+                print("GAME: {}".format(i + 1))
+                alpha_zero.play_with_human(human_first=i % 2)
+        except:
+            exc = traceback.format_exc()
+            print(exc)
+        finally:
+            alpha_zero.view_server.stop()

@@ -3,18 +3,24 @@ import sys
 
 import numpy as np
 import threading
-import gomoku_gui
+import time
+
+sys.path.append("../src")
+from view_server import view_server
+import library
 
 if __name__ == "__main__":
-    gomoku_gui = gomoku_gui.GomokuGUI(10)
-    t = threading.Thread(target=gomoku_gui.loop)
+    gomoku_gui = view_server.ViewServer()
+    t = threading.Thread(target=gomoku_gui.run)
     t.start()
+    time.sleep(2)
 
+    amz = library.Amazon(1)
+    amz.execute_move(153 + 5184 * 0)
+    amz.display()
     # test
-    gomoku_gui.execute_move(1, 0)
-    gomoku_gui.execute_move(-1, 1)
-    gomoku_gui.execute_move(1, 2)
-    gomoku_gui.execute_move(-1, 3)
-    gomoku_gui.set_is_human(True)
-
-    t.join()
+    gomoku_gui.execute_move(amz.get_last_move())
+    # while True:
+    #     gomoku_gui.notification("haha", "warn")
+    #     time.sleep(2)
+    # gomoku_gui.stop()
